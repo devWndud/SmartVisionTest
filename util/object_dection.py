@@ -4,59 +4,75 @@ import random
 import os
 import numpy as np
 import time
-from darknet import darknet
 import cv2
+
+# Darknet import 시도 (없으면 경고만 출력)
+try:
+    from darknet import darknet
+    DARKNET_AVAILABLE = True
+except ImportError:
+    print("Warning: Darknet not found. Object detection will be disabled.")
+    print("Install Darknet to enable object detection functionality.")
+    DARKNET_AVAILABLE = False
+    darknet = None
 
 netMain = None
 metaMain = None
 altNames = None
 
+# Darknet 초기화 (사용 가능한 경우에만)
+if DARKNET_AVAILABLE:
+    configPath = "./darknet/cfg/obj.cfg"
+    # 가중치 파일 경로: obj_last_yolov3.weights 또는 yolov3_obj.weights 중 하나 사용
+    weightPath = "./darknet/obj_last_yolov3.weights"
+    if not os.path.exists(weightPath):
+        weightPath = "./darknet/yolov3_obj.weights"  # 대체 경로
+    metaPath = "./darknet/cfg/obj.data"
+    
+    if os.path.exists(configPath) and os.path.exists(weightPath) and os.path.exists(metaPath):
+        try:
+            if netMain is None:
+                netMain = darknet.load_net_custom(configPath.encode(
+                        "utf-8"), weightPath.encode("utf-8"), 0, 1)  # batch size = 1
+            if metaMain is None:
+                metaMain = darknet.load_meta(metaPath.encode("ascii"))
+        except Exception as e:
+            print(f"Warning: Failed to load Darknet model: {e}")
+            DARKNET_AVAILABLE = False
+    else:
+        print("Warning: Darknet config/weight files not found. Object detection disabled.")
+        DARKNET_AVAILABLE = False
 
-configPath = "./darknet/cfg/obj.cfg"
-# 가중치 파일 경로: obj_last_yolov3.weights 또는 yolov3_obj.weights 중 하나 사용
-weightPath = "./darknet/obj_last_yolov3.weights"
-if not os.path.exists(weightPath):
-    weightPath = "./darknet/yolov3_obj.weights"  # 대체 경로
-metaPath = "./darknet/cfg/obj.data"
-if not os.path.exists(configPath):
-    raise ValueError("Invalid config path `" +
-                         os.path.abspath(configPath)+"`")
-if not os.path.exists(weightPath):
-    raise ValueError("Invalid weight path `" +
-                         os.path.abspath(weightPath)+"`")
-if not os.path.exists(metaPath):
-    raise ValueError("Invalid data file path `" +
-                         os.path.abspath(metaPath)+"`")
-if netMain is None:
-    netMain = darknet.load_net_custom(configPath.encode(
-            "utf-8"), weightPath.encode("utf-8"), 0, 1)  # batch size = 1
-if metaMain is None:
-    metaMain = darknet.load_meta(metaPath.encode("ascii"))
-if altNames is None:
+# altNames 초기화 (Darknet 사용 가능한 경우에만)
+if DARKNET_AVAILABLE and altNames is None:
     try:
-        with open(metaPath) as metaFH:
-            metaContents = metaFH.read()
-            import re
-            match = re.search("names *= *(.*)$", metaContents,
-                               re.IGNORECASE | re.MULTILINE)
-            if match:
-                result = match.group(1)
-            else:
-                result = None
-            try:
-                 if os.path.exists(result):
-                    with open(result) as namesFH:
-                        namesList = namesFH.read().strip().split("\n")
-                        altNames = [x.strip() for x in namesList]
-            except TypeError:
-                pass
+        metaPath = "./darknet/cfg/obj.data"
+        if os.path.exists(metaPath):
+            with open(metaPath) as metaFH:
+                metaContents = metaFH.read()
+                import re
+                match = re.search("names *= *(.*)$", metaContents,
+                                   re.IGNORECASE | re.MULTILINE)
+                if match:
+                    result = match.group(1)
+                else:
+                    result = None
+                try:
+                     if os.path.exists(result):
+                        with open(result) as namesFH:
+                            namesList = namesFH.read().strip().split("\n")
+                            altNames = [x.strip() for x in namesList]
+                except TypeError:
+                    pass
     except Exception:
         pass
-        
 
-    # Create an image we reuse for each detect
-darknet_image = darknet.make_image(darknet.network_width(netMain),
-                                    darknet.network_height(netMain),3)
+# Create an image we reuse for each detect (Darknet 사용 가능한 경우에만)
+if DARKNET_AVAILABLE and netMain is not None:
+    darknet_image = darknet.make_image(darknet.network_width(netMain),
+                                        darknet.network_height(netMain),3)
+else:
+    darknet_image = None
 
 movable = ['bicycle', 'bus' ,'car' ,'carrier' ,'cat' ,'dog' ,'motorcycle' ,'movable_signage'  ,'person' ,'scooter' ,'stroller' ,'truck' ,'wheelchair']
 fixed = ['barricade', 'bench' ,'bollard' ,'chair' ,'fire_hydrant' ,'kiosk' ,'parking_meter' ,'pole' ,'potted_plant' ,'power_controller' ,'stop' ,'table' ,'traffic_light' ,'traffic_light_controller' ,'traffic_sign' ,'tree_trunk']
@@ -121,6 +137,13 @@ def cvDrawBoxes(detections, img):
 
 def YOLO(frame): 
     global metaMain, netMain, altNames
+    
+    # Darknet이 없으면 빈 결과 반환
+    if not DARKNET_AVAILABLE or netMain is None or metaMain is None:
+        moving_object = []
+        fixed_object = []
+        return frame.copy(), moving_object, fixed_object
+    
     try:
         frame_read = frame
         frame_read= np.array(frame, np.uint8)
@@ -136,8 +159,11 @@ def YOLO(frame):
         image, moving_object, fixed_object = cvDrawBoxes(detections, frame_resized)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = cv2.resize(image, (480,270))
-    except:
-        return frame,  moving_object, fixed_object
+    except Exception as e:
+        print(f"Warning: YOLO detection failed: {e}")
+        moving_object = []
+        fixed_object = []
+        return frame.copy(), moving_object, fixed_object
     
     return image, moving_object, fixed_object
 

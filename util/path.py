@@ -32,9 +32,14 @@ def selly_vision_img(model, img, point_cloud, max_dist, fix_dist):
     obstacle[only_sidewalk!=0] = 0
     
     angle = point.copy()
-    angle[angle[:, :,2]==np.inf]=1
-    angle = np.arctan((angle[:, :,0]/angle[:,:,2]
-                            ))/np.pi * 180
+    # inf 값 처리
+    angle[angle[:, :,2]==np.inf] = 1
+    # 0으로 나누기 방지
+    angle[angle[:, :,2]==0] = 1
+    # 각도 계산: arctan(x/z) * 180 / pi
+    angle = np.arctan((angle[:, :,0]/angle[:,:,2]))/np.pi * 180
+    # NaN 값 처리 (0으로 나누기 등으로 인한)
+    angle = np.nan_to_num(angle, nan=0.0, posinf=90.0, neginf=-90.0)
     angle = angle[:,:, np.newaxis]
     angle= np.concatenate((angle,angle,angle) , axis = 2)
 
@@ -59,19 +64,29 @@ def selly_vision_img(model, img, point_cloud, max_dist, fix_dist):
 
     obstacle[(depth[:,:,0] > fix_dist) |(point[:,:,1] < -3) |  (point[:,:,1] ==np.inf)]=0 #일정 높이이상 장애물 제거
     obs_count={}
-    oba = np.unique(np.round(angle[(obstacle!=0) & (obstacle<fix_dist)]), return_counts=True)
-    for i, j in zip(oba[0],oba[1]):
-        if not np.isnan(i):
-            obs_count[i] = j
+    
+    # 장애물이 있는 각도 계산
+    obstacle_mask = (obstacle!=0) & (obstacle<fix_dist)
+    if np.any(obstacle_mask):
+        oba = np.unique(np.round(angle[obstacle_mask]), return_counts=True)
+        for i, j in zip(oba[0],oba[1]):
+            if not np.isnan(i):
+                obs_count[i] = j
     
     # NaN 제거 후 min/max 계산
     angle_valid = angle[~np.isnan(angle)]
     if len(angle_valid) > 0:
         angle_min = int(np.min(angle_valid))
         angle_max = int(np.max(angle_valid))
+        # 각도 범위 초기화 (장애물이 없는 각도는 0으로 설정)
         for i in range(angle_min, angle_max + 1):
             if not i in obs_count.keys():
                 obs_count[i] = 0
+    else:
+        # angle_valid가 비어있으면 기본값 설정
+        print("Warning: No valid angles found, using default range")
+        for i in range(-45, 46):
+            obs_count[i] = 0
       
     for i in moving_object_position:
         if len(i) >= 3 and i[2] < 7 and not (np.isnan(i[0]) or np.isnan(i[1])):
@@ -91,15 +106,39 @@ def selly_vision_img(model, img, point_cloud, max_dist, fix_dist):
             except (ValueError, OverflowError):
                 continue
                     
+    # obs_count가 비어있으면 기본값 반환
+    if len(obs_count) == 0:
+        print("Warning: obs_count is empty, returning default angle 0")
+        return [[0.0, 0]]
+    
     able_angle = sorted(obs_count.items(), key =  lambda x : (x[1], np.abs(x[1])))
     able_angle = np.array(able_angle)
+    
+    # able_angle이 비어있으면 기본값 반환
+    if len(able_angle) == 0:
+        print("Warning: able_angle is empty, returning default angle 0")
+        return [[0.0, 0]]
+    
     ang_dict = {}
     for i in able_angle[:,0]:
         if not np.isnan(i):
-            value = np.round(np.mean(able_angle[:,1][(able_angle[:,0] >= -10+i) & (able_angle[:,0] <= +10+i)]))
-            if not np.isnan(value):
-                ang_dict[i] = value 
+            mask = (able_angle[:,0] >= -10+i) & (able_angle[:,0] <= +10+i)
+            if np.any(mask):
+                value = np.round(np.mean(able_angle[:,1][mask]))
+                if not np.isnan(value):
+                    ang_dict[i] = value 
+    
+    # ang_dict가 비어있으면 기본값 반환
+    if len(ang_dict) == 0:
+        print("Warning: ang_dict is empty, returning default angle 0")
+        return [[0.0, 0]]
+    
     able_angle = sorted(ang_dict.items(), key =  lambda x : (x[1], np.abs(x[0])))
+    
+    # 최종 결과가 비어있으면 기본값 반환
+    if len(able_angle) == 0:
+        print("Warning: Final able_angle is empty, returning default angle 0")
+        return [[0.0, 0]]
 
     '''plt.imshow(obstacle)
     plt.title("move :"+str(max_dist)+ "M," + "fixed : "+str(fix_dist)+"M")

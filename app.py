@@ -75,6 +75,11 @@ def vision_process():
         # 비전 처리
         result_angles = selly_vision_redis(img.copy(), point.copy(), moving_dist=5, fixed_dist=2.5)
         
+        # 디버깅: 결과 확인
+        print(f"Debug: result_angles type={type(result_angles)}, length={len(result_angles) if hasattr(result_angles, '__len__') else 'N/A'}")
+        if len(result_angles) > 0:
+            print(f"Debug: First angle={result_angles[0]}")
+        
         # 시각화를 위한 처리
         try:
             # visualize 함수 사용 (더미 파라미터)
@@ -91,14 +96,20 @@ def vision_process():
             
             # 각도 정보 추출
             angles = []
+            recommended_angle = 0.0
+            
             if len(result_angles) > 0:
+                # result_angles는 [[angle, count], ...] 형태
                 angles = [float(angle[0]) for angle in result_angles[:5]]  # 상위 5개 각도
+                recommended_angle = float(result_angles[0][0])
+            else:
+                print("Warning: No angles returned, using default 0.0")
             
             return jsonify({
                 'success': True,
                 'image': f'data:image/jpeg;base64,{img_base64}',
                 'angles': angles,
-                'recommended_angle': float(result_angles[0][0]) if len(result_angles) > 0 else 0.0,
+                'recommended_angle': recommended_angle,
                 'moving_objects': len(moving_object),
                 'fixed_objects': len(fixed_object)
             })

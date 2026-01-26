@@ -9,6 +9,11 @@ def selly_vision_img(model, img, point_cloud, max_dist, fix_dist):
     only_sidewalk = seg_predict(img.copy(),model)
     obj_frame, moving_object, fixed_object  = YOLO(img.copy())
     point = point_cloud.copy()
+    
+    # 포인트 클라우드를 이미지 크기로 리사이즈 (67,120) -> (270,480)
+    if point.shape[:2] != img.shape[:2]:
+        point = cv2.resize(point, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
+    
     point[200 :,:, 2][(point[200 :,:, 2] >5) & (only_sidewalk[200:,:,0] !=0)] = np.mean(point[:,:, 2][(point[:,:, 2]<2)& (only_sidewalk[:,:,0] !=0)])
     point[200 :,:, 1][(point[200 :,:, 1] >3) & (only_sidewalk[200:,:,0] !=0)] = np.mean(point[:,:, 1][(point[:,:, 1]<3)& (only_sidewalk[:,:,0] !=0)])
     #point[200 :,:, 0][(point[200 :,:, 0] ==np.inf) | (np.abs(point[200 :,:, 0])>2)] = np.mean(point[200:,:, 0][point[200:,:, 0]<2])

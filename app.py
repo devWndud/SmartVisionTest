@@ -148,6 +148,9 @@ def vision_visualize():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    print("Starting Flask server...")
-    print("Open http://localhost:5000 in your browser")
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    import sys
+    # 포트를 명령줄 인자로 받거나 기본값 사용
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+    print(f"Starting Flask server on port {port}...")
+    print(f"Open http://localhost:{port} in your browser")
+    app.run(host='0.0.0.0', port=port, debug=True)

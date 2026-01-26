@@ -1,0 +1,16 @@
+# Core dependencies
+Flask>=2.0.0
+numpy>=1.19.0
+opencv-python>=4.5.0
+Pillow>=8.0.0
+matplotlib>=3.3.0
+
+# Deep Learning
+tensorflow>=2.5.0
+# For GPU support, install: tensorflow-gpu>=2.5.0
+# Or use: pip install tensorflow[and-cuda]
+
+# Optional dependencies
+redis>=3.5.0  # For Redis-based processing
+requests>=2.25.0  # For API requests
+

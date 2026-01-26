@@ -32,6 +32,8 @@ brew install git-lfs
 ```
 
 ### 2. 저장소 클론 및 LFS 파일 다운로드
+
+**처음 클론하는 경우:**
 ```bash
 # 저장소 클론
 git clone https://github.com/devWndud/SmartVisionTest.git
@@ -44,7 +46,25 @@ git lfs install
 git lfs pull
 ```
 
-**참고:** `.weights` 파일과 `.pb` 파일은 Git LFS로 관리되므로, `git lfs pull`을 실행해야 실제 파일이 다운로드됩니다.
+**이미 클론한 경우 (업데이트):**
+```bash
+# 프로젝트 디렉토리로 이동
+cd SmartVisionTest
+
+# Git LFS 초기화 (처음 한 번만 필요)
+git lfs install
+
+# LFS 파일 다운로드 (가중치 파일 등) - 필수!
+git lfs pull
+
+# 최신 코드 업데이트
+git pull
+```
+
+**참고:** 
+- `.weights` 파일과 `.pb` 파일은 Git LFS로 관리되므로, `git lfs pull`을 실행해야 실제 파일이 다운로드됩니다.
+- `git pull`만으로는 코드만 업데이트되고 큰 파일은 다운로드되지 않습니다.
+- LFS 파일이 제대로 다운로드되었는지 확인: `ls -lh darknet/yolov3_obj.weights` (약 235MB 파일이어야 함)
 
 ## 리눅스 서버에서 실행하기 (Running on Linux Server)
 

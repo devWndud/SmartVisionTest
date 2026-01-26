@@ -150,4 +150,4 @@ def vision_visualize():
 if __name__ == '__main__':
     print("Starting Flask server...")
     print("Open http://localhost:5000 in your browser")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True)
